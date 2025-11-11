@@ -13,14 +13,14 @@ type Profession struct {
 
 // Predefined professions
 const (
-	ProfessionEnfermeiro              = "Enfermeiro"
-	ProfessionMedico                  = "Médico"
-	ProfessionAgenteComunitario       = "Agente Comunitário de Saúde"
-	ProfessionOdontologo             = "Odontólogo"
-	ProfessionTecnicoEnfermagem      = "Técnico de Enfermagem"
-	ProfessionFisioterapeuta         = "Fisioterapeuta"
-	ProfessionPsicologo              = "Psicólogo"
-	ProfessionNutricionista          = "Nutricionista"
-	ProfessionFarmaceutico           = "Farmacêutico"
-	ProfessionAssistenteSocial       = "Assistente Social"
+	ProfessionEnfermeiro        = "Enfermeiro"
+	ProfessionMedico            = "Médico"
+	ProfessionAgenteComunitario = "Agente Comunitário de Saúde"
+	ProfessionOdontologo        = "Odontólogo"
+	ProfessionTecnicoEnfermagem = "Técnico de Enfermagem"
+	ProfessionFisioterapeuta    = "Fisioterapeuta"
+	ProfessionPsicologo         = "Psicólogo"
+	ProfessionNutricionista     = "Nutricionista"
+	ProfessionFarmaceutico      = "Farmacêutico"
+	ProfessionAssistenteSocial  = "Assistente Social"
 )

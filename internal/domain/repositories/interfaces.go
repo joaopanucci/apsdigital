@@ -49,10 +49,11 @@ type RoleRepository interface {
 
 type ProfessionRepository interface {
 	Create(ctx context.Context, profession *entities.Profession) error
-	GetByID(ctx context.Context, id uuid.UUID) (*entities.Profession, error)
-	List(ctx context.Context, activeOnly bool) ([]*entities.Profession, error)
+	GetByID(ctx context.Context, id int) (*entities.Profession, error)
+	GetByName(ctx context.Context, name string) (*entities.Profession, error)
+	GetAll(ctx context.Context) ([]*entities.Profession, error)
 	Update(ctx context.Context, profession *entities.Profession) error
-	Delete(ctx context.Context, id uuid.UUID) error
+	Delete(ctx context.Context, id int) error
 }
 
 type TabletRequestRepository interface {

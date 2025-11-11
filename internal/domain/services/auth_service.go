@@ -21,7 +21,7 @@ type AuthService struct {
 	userRepo         repositories.UserRepository
 	refreshTokenRepo repositories.RefreshTokenRepository
 	roleRepo         repositories.RoleRepository
-	config          *config.Config
+	config           *config.Config
 }
 
 type Claims struct {
@@ -39,8 +39,8 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	AccessToken  string        `json:"access_token"`
-	RefreshToken string        `json:"refresh_token"`
+	AccessToken  string         `json:"access_token"`
+	RefreshToken string         `json:"refresh_token"`
 	User         *entities.User `json:"user"`
 }
 
@@ -61,7 +61,7 @@ func NewAuthService(userRepo repositories.UserRepository, refreshTokenRepo repos
 		userRepo:         userRepo,
 		refreshTokenRepo: refreshTokenRepo,
 		roleRepo:         roleRepo,
-		config:          config,
+		config:           config,
 	}
 }
 
@@ -70,16 +70,16 @@ func (s *AuthService) Register(ctx context.Context, req *RegisterRequest) (*enti
 	if !utils.ValidateCPF(req.CPF) {
 		return nil, fmt.Errorf("CPF inválido")
 	}
-	
+
 	// Clean CPF for storage
 	req.CPF = utils.CleanCPF(req.CPF)
-	
+
 	// Validate role - prevent ADM registration
 	role, err := s.roleRepo.GetByID(ctx, req.RoleID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid role")
 	}
-	
+
 	// Block ADM role registration (level 1 is ADM)
 	if role.Level == 1 || role.Name == "ADM" {
 		return nil, fmt.Errorf("ADM role registration is not allowed")
@@ -130,7 +130,7 @@ func (s *AuthService) Login(ctx context.Context, req *LoginRequest) (*LoginRespo
 		return nil, fmt.Errorf("credenciais inválidas")
 	}
 	req.CPF = utils.CleanCPF(req.CPF)
-	
+
 	// Get user by CPF
 	user, err := s.userRepo.GetByCPF(ctx, req.CPF)
 	if err != nil {

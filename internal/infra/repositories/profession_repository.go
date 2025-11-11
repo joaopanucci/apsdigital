@@ -32,7 +32,7 @@ func (r *professionRepository) Create(ctx context.Context, profession *entities.
 		VALUES ($1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		RETURNING id, created_at, updated_at
 	`
-	
+
 	row := r.db.Pool.QueryRow(ctx, query, profession.Name)
 	return row.Scan(&profession.ID, &profession.CreatedAt, &profession.UpdatedAt)
 }
@@ -43,21 +43,21 @@ func (r *professionRepository) GetByID(ctx context.Context, id int) (*entities.P
 		FROM professions
 		WHERE id = $1
 	`
-	
+
 	var profession entities.Profession
 	row := r.db.Pool.QueryRow(ctx, query, id)
-	
+
 	err := row.Scan(
 		&profession.ID,
 		&profession.Name,
 		&profession.CreatedAt,
 		&profession.UpdatedAt,
 	)
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &profession, nil
 }
 
@@ -67,21 +67,21 @@ func (r *professionRepository) GetByName(ctx context.Context, name string) (*ent
 		FROM professions
 		WHERE name = $1
 	`
-	
+
 	var profession entities.Profession
 	row := r.db.Pool.QueryRow(ctx, query, name)
-	
+
 	err := row.Scan(
 		&profession.ID,
 		&profession.Name,
 		&profession.CreatedAt,
 		&profession.UpdatedAt,
 	)
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &profession, nil
 }
 
@@ -91,13 +91,13 @@ func (r *professionRepository) GetAll(ctx context.Context) ([]*entities.Professi
 		FROM professions
 		ORDER BY name ASC
 	`
-	
+
 	rows, err := r.db.Pool.Query(ctx, query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var professions []*entities.Profession
 	for rows.Next() {
 		var profession entities.Profession
@@ -112,7 +112,7 @@ func (r *professionRepository) GetAll(ctx context.Context) ([]*entities.Professi
 		}
 		professions = append(professions, &profession)
 	}
-	
+
 	return professions, rows.Err()
 }
 
@@ -123,7 +123,7 @@ func (r *professionRepository) Update(ctx context.Context, profession *entities.
 		WHERE id = $1
 		RETURNING updated_at
 	`
-	
+
 	row := r.db.Pool.QueryRow(ctx, query, profession.ID, profession.Name)
 	return row.Scan(&profession.UpdatedAt)
 }

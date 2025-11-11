@@ -9,10 +9,10 @@ import (
 type UserStatus string
 
 const (
-	UserStatusActive              UserStatus = "active"
+	UserStatusActive               UserStatus = "active"
 	UserStatusPendingAuthorization UserStatus = "pending_authorization"
-	UserStatusBlocked             UserStatus = "blocked"
-	UserStatusInactive           UserStatus = "inactive"
+	UserStatusBlocked              UserStatus = "blocked"
+	UserStatusInactive             UserStatus = "inactive"
 )
 
 type User struct {
@@ -32,10 +32,10 @@ type User struct {
 	ProfilePhoto   string     `json:"profile_photo" db:"profile_photo"`
 	CreatedAt      time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at" db:"updated_at"`
-	
+
 	// Relations
-	Role         *Role         `json:"role,omitempty"`
-	Profession   *Profession   `json:"profession,omitempty"`
+	Role             *Role         `json:"role,omitempty"`
+	Profession       *Profession   `json:"profession,omitempty"`
 	MunicipalityInfo *Municipality `json:"municipality_info,omitempty"`
 }
 

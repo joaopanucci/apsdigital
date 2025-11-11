@@ -42,7 +42,7 @@ func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (*entities.U
 		       u.role_id, u.profession_id, u.municipality, u.unit, u.status, 
 		       u.created_at, u.updated_at,
 		       r.id, r.name, r.description, r.level, r.created_at, r.updated_at,
-		       p.id, p.name, p.description, p.is_active, p.created_at, p.updated_at
+		       p.id, p.name, p.created_at, p.updated_at
 		FROM users u
 		LEFT JOIN roles r ON u.role_id = r.id
 		LEFT JOIN professions p ON u.profession_id = p.id
@@ -82,7 +82,7 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*entitie
 		       u.role_id, u.profession_id, u.municipality, u.unit, u.status, 
 		       u.created_at, u.updated_at,
 		       r.id, r.name, r.description, r.level, r.created_at, r.updated_at,
-		       p.id, p.name, p.description, p.is_active, p.created_at, p.updated_at
+		       p.id, p.name, p.created_at, p.updated_at
 		FROM users u
 		LEFT JOIN roles r ON u.role_id = r.id
 		LEFT JOIN professions p ON u.profession_id = p.id
