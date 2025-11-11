@@ -3,7 +3,7 @@ package repositories
 import (
 	"context"
 
-	"apsdigital/internal/domain/entities"
+	"github.com/joaopanucci/apsdigital/internal/domain/entities"
 	"github.com/google/uuid"
 )
 

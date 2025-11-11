@@ -2,14 +2,13 @@ package repositories
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
-	"time"
 
-	"apsdigital/internal/domain/entities"
-	"apsdigital/internal/infra/db"
+	"github.com/joaopanucci/apsdigital/internal/domain/entities"
+	"github.com/joaopanucci/apsdigital/internal/infra/db"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 )
 
 type refreshTokenRepository struct {
@@ -25,7 +24,7 @@ func (r *refreshTokenRepository) Create(ctx context.Context, token *entities.Ref
 		INSERT INTO refresh_tokens (id, user_id, token, expires_at)
 		VALUES ($1, $2, $3, $4)
 	`
-	
+
 	token.ID = uuid.New()
 	_, err := r.db.Pool.Exec(ctx, query, token.ID, token.UserID, token.Token, token.ExpiresAt)
 	return err
@@ -37,22 +36,22 @@ func (r *refreshTokenRepository) GetByToken(ctx context.Context, token string) (
 		FROM refresh_tokens
 		WHERE token = $1 AND is_revoked = false AND expires_at > NOW()
 	`
-	
+
 	row := r.db.Pool.QueryRow(ctx, query, token)
-	
+
 	var refreshToken entities.RefreshToken
 	err := row.Scan(
 		&refreshToken.ID, &refreshToken.UserID, &refreshToken.Token,
 		&refreshToken.ExpiresAt, &refreshToken.IsRevoked, &refreshToken.CreatedAt,
 	)
-	
+
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("refresh token not found or expired")
 		}
 		return nil, err
 	}
-	
+
 	return &refreshToken, nil
 }
 

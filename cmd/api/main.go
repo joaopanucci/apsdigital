@@ -4,9 +4,9 @@ import (
 	"log"
 	"os"
 
-	"apsdigital/internal/config"
-	"apsdigital/internal/infra/db"
-	"apsdigital/internal/infra/http/router"
+	"github.com/joaopanucci/apsdigital/internal/config"
+	"github.com/joaopanucci/apsdigital/internal/infra/db"
+	"github.com/joaopanucci/apsdigital/internal/infra/http/router"
 
 	"github.com/gin-gonic/gin"
 )
@@ -34,7 +34,7 @@ func main() {
 	}
 
 	// Initialize router
-	r := router.SetupRoutes(database, cfg)
+	r := router.NewRouter(database, cfg)
 
 	// Create uploads directory
 	if err := os.MkdirAll(cfg.Upload.Path, 0755); err != nil {

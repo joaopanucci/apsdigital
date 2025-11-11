@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"apsdigital/internal/domain/entities"
-	"apsdigital/internal/domain/repositories"
+	"github.com/joaopanucci/apsdigital/internal/domain/entities"
+	"github.com/joaopanucci/apsdigital/internal/domain/repositories"
 )
 
 type MunicipalityService struct {

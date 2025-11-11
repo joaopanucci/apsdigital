@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"apsdigital/internal/domain/entities"
-	"apsdigital/internal/domain/repositories"
+	"github.com/joaopanucci/apsdigital/internal/domain/entities"
+	"github.com/joaopanucci/apsdigital/internal/domain/repositories"
 )
 
 type TabletPostgresRepository struct {

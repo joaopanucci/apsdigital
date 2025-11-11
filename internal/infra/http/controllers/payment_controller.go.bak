@@ -1,14 +1,8 @@
 package controllers
 
 import (
-	"fmt"
-	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -224,10 +218,7 @@ func (c *PaymentController) GetCompetences(ctx *gin.Context) {
 
 	var municipalityID *uint
 	if userEntity.Role.Name != "ADM" {
-		if userEntity.MunicipalityID != nil {
-			id := uint(*userEntity.MunicipalityID)
-			municipalityID = &id
-		}
+		if userEntity.MunicipalityID != nil { id := uint(*userEntity.MunicipalityID); municipalityID = &id }
 	}
 
 	competences, err := c.paymentService.GetCompetences(ctx.Request.Context(), municipalityID)
@@ -250,10 +241,7 @@ func (c *PaymentController) GetYears(ctx *gin.Context) {
 
 	var municipalityID *uint
 	if userEntity.Role.Name != "ADM" {
-		if userEntity.MunicipalityID != nil {
-			id := uint(*userEntity.MunicipalityID)
-			municipalityID = &id
-		}
+		if userEntity.MunicipalityID != nil { id := uint(*userEntity.MunicipalityID); municipalityID = &id }
 	}
 
 	years, err := c.paymentService.GetYears(ctx.Request.Context(), municipalityID)
@@ -334,157 +322,5 @@ func (c *PaymentController) DownloadPDF(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{
 		"file_url": payment.FileURL,
 		"filename": "pagamento-" + payment.Competence + ".pdf",
-	})
-}
-
-// GetPaymentsPublic - Public version for testing (no auth required)
-func (c *PaymentController) GetPaymentsPublic(ctx *gin.Context) {
-	var filters PaymentFilters
-	if err := ctx.ShouldBindQuery(&filters); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Build filters map (without user restrictions for testing)
-	filterMap := make(map[string]interface{})
-
-	if filters.Year != "" {
-		year, err := strconv.Atoi(filters.Year)
-		if err == nil {
-			filterMap["year"] = year
-		}
-	}
-
-	if filters.Month != "" {
-		month, err := strconv.Atoi(filters.Month)
-		if err == nil {
-			filterMap["month"] = month
-		}
-	}
-
-	if filters.Competence != "" {
-		filterMap["competence"] = filters.Competence
-	}
-
-	var payments []*entities.Payment
-	var err error
-
-	if filters.Page > 0 && filters.Limit > 0 {
-		payments, err = c.paymentService.GetPaymentsWithPagination(ctx.Request.Context(), filterMap, filters.Page, filters.Limit)
-	} else {
-		payments, err = c.paymentService.GetAllPayments(ctx.Request.Context(), filterMap)
-	}
-
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get payments: " + err.Error()})
-		return
-	}
-
-	ctx.JSON(http.StatusOK, payments)
-}
-
-// GetCompetencesPublic - Public version for testing
-func (c *PaymentController) GetCompetencesPublic(ctx *gin.Context) {
-	competences, err := c.paymentService.GetCompetences(ctx.Request.Context(), nil)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get competences: " + err.Error()})
-		return
-	}
-
-	ctx.JSON(http.StatusOK, competences)
-}
-
-// GetYearsPublic - Public version for testing
-func (c *PaymentController) GetYearsPublic(ctx *gin.Context) {
-	years, err := c.paymentService.GetYears(ctx.Request.Context(), nil)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get years: " + err.Error()})
-		return
-	}
-
-	ctx.JSON(http.StatusOK, years)
-}
-
-// UploadPaymentFile handles PDF file upload for payments
-func (c *PaymentController) UploadPaymentFile(ctx *gin.Context) {
-	// Get the multipart form file
-	file, header, err := ctx.Request.FormFile("file")
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "No file provided"})
-		return
-	}
-	defer file.Close()
-
-	// Get other form data
-	competence := ctx.PostForm("competence")
-	municipalityIDStr := ctx.PostForm("municipality_id")
-
-	if competence == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Competence is required"})
-		return
-	}
-
-	if municipalityIDStr == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Municipality ID is required"})
-		return
-	}
-
-	municipalityID, err := strconv.ParseUint(municipalityIDStr, 10, 32)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid municipality ID"})
-		return
-	}
-
-	// Validate file type
-	if !strings.HasSuffix(strings.ToLower(header.Filename), ".pdf") {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Only PDF files are allowed"})
-		return
-	}
-
-	// Create uploads directory if it doesn't exist
-	uploadsDir := "uploads/payments"
-	if err := os.MkdirAll(uploadsDir, os.ModePerm); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create uploads directory"})
-		return
-	}
-
-	// Generate unique filename
-	timestamp := time.Now().Format("20060102_150405")
-	filename := fmt.Sprintf("payment_%s_%s_%s", competence, timestamp, header.Filename)
-	filePath := filepath.Join(uploadsDir, filename)
-
-	// Create the file on disk
-	dst, err := os.Create(filePath)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create file"})
-		return
-	}
-	defer dst.Close()
-
-	// Copy the uploaded file to destination
-	if _, err := io.Copy(dst, file); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file"})
-		return
-	}
-
-	// Create payment record in database
-	payment := &entities.Payment{
-		FileURL:        "/" + filePath, // Store relative path
-		Competence:     competence,
-		MunicipalityID: func() *int { i := int(municipalityID); return &i }(),
-		// Note: UploadedBy will need authentication middleware to set user
-	}
-
-	if err := c.paymentService.CreatePayment(ctx.Request.Context(), payment); err != nil {
-		// If database save fails, clean up the file
-		os.Remove(filePath)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save payment record"})
-		return
-	}
-
-	ctx.JSON(http.StatusCreated, gin.H{
-		"message":  "Payment file uploaded successfully",
-		"payment":  payment,
-		"filename": filename,
 	})
 }

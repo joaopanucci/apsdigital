@@ -1,14 +1,8 @@
 package controllers
 
 import (
-	"fmt"
-	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -238,10 +232,7 @@ func (c *ResolutionController) GetTypes(ctx *gin.Context) {
 
 	var municipalityID *uint
 	if userEntity.Role.Name != "ADM" {
-		if userEntity.MunicipalityID != nil {
-			id := uint(*userEntity.MunicipalityID)
-			municipalityID = &id
-		}
+		if userEntity.MunicipalityID != nil { id := uint(*userEntity.MunicipalityID); municipalityID = &id }
 	}
 
 	types, err := c.resolutionService.GetTypes(ctx.Request.Context(), municipalityID)
@@ -264,10 +255,7 @@ func (c *ResolutionController) GetYears(ctx *gin.Context) {
 
 	var municipalityID *uint
 	if userEntity.Role.Name != "ADM" {
-		if userEntity.MunicipalityID != nil {
-			id := uint(*userEntity.MunicipalityID)
-			municipalityID = &id
-		}
+		if userEntity.MunicipalityID != nil { id := uint(*userEntity.MunicipalityID); municipalityID = &id }
 	}
 
 	years, err := c.resolutionService.GetYears(ctx.Request.Context(), municipalityID)
@@ -296,10 +284,7 @@ func (c *ResolutionController) GetRecentResolutions(ctx *gin.Context) {
 
 	var municipalityID *uint
 	if userEntity.Role.Name != "ADM" {
-		if userEntity.MunicipalityID != nil {
-			id := uint(*userEntity.MunicipalityID)
-			municipalityID = &id
-		}
+		if userEntity.MunicipalityID != nil { id := uint(*userEntity.MunicipalityID); municipalityID = &id }
 	}
 
 	resolutions, err := c.resolutionService.GetRecentResolutions(ctx.Request.Context(), municipalityID, limit)
@@ -380,176 +365,5 @@ func (c *ResolutionController) DownloadPDF(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{
 		"file_url": resolution.FileURL,
 		"filename": "resolucao-" + resolution.Number + ".pdf",
-	})
-}
-
-// GetResolutionsPublic - Public version for testing (no auth required)
-func (c *ResolutionController) GetResolutionsPublic(ctx *gin.Context) {
-	var filters ResolutionFilters
-	if err := ctx.ShouldBindQuery(&filters); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Build filters map (without user restrictions for testing)
-	filterMap := make(map[string]interface{})
-
-	if filters.Year != "" {
-		year, err := strconv.Atoi(filters.Year)
-		if err == nil {
-			filterMap["year"] = year
-		}
-	}
-
-	if filters.Type != "" {
-		filterMap["type"] = filters.Type
-	}
-
-	if filters.Competence != "" {
-		filterMap["competence"] = filters.Competence
-	}
-
-	var resolutions []*entities.Resolution
-	var err error
-
-	if filters.Page > 0 && filters.Limit > 0 {
-		resolutions, err = c.resolutionService.GetResolutionsWithPagination(ctx.Request.Context(), filterMap, filters.Page, filters.Limit)
-	} else {
-		resolutions, err = c.resolutionService.GetAllResolutions(ctx.Request.Context(), filterMap)
-	}
-
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get resolutions: " + err.Error()})
-		return
-	}
-
-	ctx.JSON(http.StatusOK, resolutions)
-}
-
-// GetTypesPublic - Public version for testing
-func (c *ResolutionController) GetTypesPublic(ctx *gin.Context) {
-	types, err := c.resolutionService.GetTypes(ctx.Request.Context(), nil)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get types: " + err.Error()})
-		return
-	}
-
-	ctx.JSON(http.StatusOK, types)
-}
-
-// GetYearsPublic - Public version for testing
-func (c *ResolutionController) GetYearsPublic(ctx *gin.Context) {
-	years, err := c.resolutionService.GetYears(ctx.Request.Context(), nil)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get years: " + err.Error()})
-		return
-	}
-
-	ctx.JSON(http.StatusOK, years)
-}
-
-// UploadResolutionFile handles PDF file upload for resolutions
-func (c *ResolutionController) UploadResolutionFile(ctx *gin.Context) {
-	// Get the multipart form file
-	file, header, err := ctx.Request.FormFile("file")
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "No file provided"})
-		return
-	}
-	defer file.Close()
-
-	// Get other form data
-	title := ctx.PostForm("title")
-	resolutionType := ctx.PostForm("type")
-	yearStr := ctx.PostForm("year")
-	number := ctx.PostForm("number")
-	municipalityIDStr := ctx.PostForm("municipality_id")
-
-	if title == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Title is required"})
-		return
-	}
-
-	if resolutionType == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Type is required"})
-		return
-	}
-
-	if yearStr == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Year is required"})
-		return
-	}
-
-	if municipalityIDStr == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Municipality ID is required"})
-		return
-	}
-
-	year, err := strconv.Atoi(yearStr)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid year"})
-		return
-	}
-
-	municipalityID, err := strconv.ParseUint(municipalityIDStr, 10, 32)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid municipality ID"})
-		return
-	}
-
-	// Validate file type
-	if !strings.HasSuffix(strings.ToLower(header.Filename), ".pdf") {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Only PDF files are allowed"})
-		return
-	}
-
-	// Create uploads directory if it doesn't exist
-	uploadsDir := "uploads/resolutions"
-	if err := os.MkdirAll(uploadsDir, os.ModePerm); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create uploads directory"})
-		return
-	}
-
-	// Generate unique filename
-	timestamp := time.Now().Format("20060102_150405")
-	filename := fmt.Sprintf("resolution_%s_%d_%s_%s", resolutionType, year, timestamp, header.Filename)
-	filePath := filepath.Join(uploadsDir, filename)
-
-	// Create the file on disk
-	dst, err := os.Create(filePath)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create file"})
-		return
-	}
-	defer dst.Close()
-
-	// Copy the uploaded file to destination
-	if _, err := io.Copy(dst, file); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file"})
-		return
-	}
-
-	// Create resolution record in database
-	resolution := &entities.Resolution{
-		Title:          title,
-		FileURL:        "/" + filePath, // Store relative path
-		Type:           entities.ResolutionType(resolutionType),
-		Year:           year,
-		Number:         number,
-		MunicipalityID: func() *int { i := int(municipalityID); return &i }(),
-		// Note: UploadedBy will need authentication middleware to set user
-	}
-
-	if err := c.resolutionService.CreateResolution(ctx.Request.Context(), resolution); err != nil {
-		// If database save fails, clean up the file
-		os.Remove(filePath)
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save resolution record"})
-		return
-	}
-
-	ctx.JSON(http.StatusCreated, gin.H{
-		"message":    "Resolution file uploaded successfully",
-		"resolution": resolution,
-		"filename":   filename,
 	})
 }

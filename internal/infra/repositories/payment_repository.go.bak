@@ -23,9 +23,9 @@ func (r *PaymentRepository) Create(ctx context.Context, payment *entities.Paymen
 		VALUES ($1, $2, $3, $4, NOW(), NOW())
 		RETURNING id, created_at, updated_at
 	`
-
-	row := r.db.Pool.QueryRow(ctx, query, payment.FileURL, payment.Competence, payment.UploadedBy, payment.MunicipalityID)
-
+	
+	row := r.db.QueryRowContext(ctx, query, payment.FileURL, payment.Competence, payment.UploadedBy, payment.MunicipalityID)
+	
 	return row.Scan(&payment.ID, &payment.CreatedAt, &payment.UpdatedAt)
 }
 
@@ -39,19 +39,19 @@ func (r *PaymentRepository) GetByID(ctx context.Context, id string) (*entities.P
 		LEFT JOIN municipalities m ON p.municipality_id = m.id
 		WHERE p.id = $1
 	`
-
+	
 	var payment entities.Payment
-	row := r.db.Pool.QueryRow(ctx, query, id)
-
+	row := r.db.QueryRowContext(ctx, query, id)
+	
 	err := row.Scan(
 		&payment.ID, &payment.FileURL, &payment.Competence, &payment.UploadedBy, &payment.MunicipalityID,
 		&payment.CreatedAt, &payment.UpdatedAt, &payment.UploadedByName, &payment.UploadedByCPF, &payment.MunicipalityName,
 	)
-
+	
 	if err != nil {
 		return nil, err
 	}
-
+	
 	return &payment, nil
 }
 
@@ -64,64 +64,64 @@ func (r *PaymentRepository) GetAll(ctx context.Context, filters map[string]inter
 		LEFT JOIN users u ON p.uploaded_by = u.id
 		LEFT JOIN municipalities m ON p.municipality_id = m.id
 	`
-
+	
 	var whereConditions []string
 	var args []interface{}
 	argIndex := 1
-
+	
 	// Filter by municipality
 	if municipalityID, ok := filters["municipality_id"]; ok && municipalityID != nil {
 		whereConditions = append(whereConditions, fmt.Sprintf("p.municipality_id = $%d", argIndex))
 		args = append(args, municipalityID)
 		argIndex++
 	}
-
+	
 	// Filter by year
 	if year, ok := filters["year"]; ok && year != nil && year != "" {
 		whereConditions = append(whereConditions, fmt.Sprintf("EXTRACT(YEAR FROM p.created_at) = $%d", argIndex))
 		args = append(args, year)
 		argIndex++
 	}
-
+	
 	// Filter by month
 	if month, ok := filters["month"]; ok && month != nil && month != "" {
 		whereConditions = append(whereConditions, fmt.Sprintf("EXTRACT(MONTH FROM p.created_at) = $%d", argIndex))
 		args = append(args, month)
 		argIndex++
 	}
-
+	
 	// Filter by competence
 	if competence, ok := filters["competence"]; ok && competence != nil && competence != "" {
 		whereConditions = append(whereConditions, fmt.Sprintf("p.competence = $%d", argIndex))
 		args = append(args, competence)
 		argIndex++
 	}
-
+	
 	if len(whereConditions) > 0 {
 		query += " WHERE " + strings.Join(whereConditions, " AND ")
 	}
-
+	
 	query += " ORDER BY p.created_at DESC"
-
+	
 	// Add limit if specified
 	if limit, ok := filters["limit"]; ok && limit != nil {
 		query += fmt.Sprintf(" LIMIT $%d", argIndex)
 		args = append(args, limit)
 		argIndex++
 	}
-
+	
 	// Add offset if specified
 	if offset, ok := filters["offset"]; ok && offset != nil {
 		query += fmt.Sprintf(" OFFSET $%d", argIndex)
 		args = append(args, offset)
 	}
-
-	rows, err := r.db.Pool.Query(ctx, query, args...)
+	
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
+	
 	var payments []*entities.Payment
 	for rows.Next() {
 		var payment entities.Payment
@@ -134,7 +134,7 @@ func (r *PaymentRepository) GetAll(ctx context.Context, filters map[string]inter
 		}
 		payments = append(payments, &payment)
 	}
-
+	
 	return payments, nil
 }
 
@@ -144,14 +144,14 @@ func (r *PaymentRepository) Update(ctx context.Context, payment *entities.Paymen
 		SET file_url = $2, competence = $3, updated_at = NOW()
 		WHERE id = $1
 	`
-
-	_, err := r.db.Pool.Exec(ctx, query, payment.ID, payment.FileURL, payment.Competence)
+	
+	_, err := r.db.ExecContext(ctx, query, payment.ID, payment.FileURL, payment.Competence)
 	return err
 }
 
 func (r *PaymentRepository) Delete(ctx context.Context, id string) error {
 	query := "DELETE FROM payments WHERE id = $1"
-	_, err := r.db.Pool.Exec(ctx, query, id)
+	_, err := r.db.ExecContext(ctx, query, id)
 	return err
 }
 
@@ -160,21 +160,21 @@ func (r *PaymentRepository) GetCompetences(ctx context.Context, municipalityID *
 		SELECT DISTINCT competence 
 		FROM payments 
 	`
-
+	
 	var args []interface{}
 	if municipalityID != nil {
 		query += " WHERE municipality_id = $1"
 		args = append(args, *municipalityID)
 	}
-
+	
 	query += " ORDER BY competence DESC"
-
-	rows, err := r.db.Pool.Query(ctx, query, args...)
+	
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
+	
 	var competences []string
 	for rows.Next() {
 		var competence string
@@ -183,7 +183,7 @@ func (r *PaymentRepository) GetCompetences(ctx context.Context, municipalityID *
 		}
 		competences = append(competences, competence)
 	}
-
+	
 	return competences, nil
 }
 
@@ -192,21 +192,21 @@ func (r *PaymentRepository) GetYears(ctx context.Context, municipalityID *uint) 
 		SELECT DISTINCT EXTRACT(YEAR FROM created_at) as year 
 		FROM payments 
 	`
-
+	
 	var args []interface{}
 	if municipalityID != nil {
 		query += " WHERE municipality_id = $1"
 		args = append(args, *municipalityID)
 	}
-
+	
 	query += " ORDER BY year DESC"
-
-	rows, err := r.db.Pool.Query(ctx, query, args...)
+	
+	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
+	
 	var years []int
 	for rows.Next() {
 		var year int
@@ -215,6 +215,6 @@ func (r *PaymentRepository) GetYears(ctx context.Context, municipalityID *uint) 
 		}
 		years = append(years, year)
 	}
-
+	
 	return years, nil
 }

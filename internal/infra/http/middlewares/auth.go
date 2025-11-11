@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"apsdigital/internal/config"
-	"apsdigital/internal/domain/entities"
+	"github.com/joaopanucci/apsdigital/internal/config"
+	"github.com/joaopanucci/apsdigital/internal/domain/entities"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"

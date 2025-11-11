@@ -23,7 +23,7 @@ type User struct {
 	CPF            string     `json:"cpf" db:"cpf"`
 	Phone          string     `json:"phone" db:"phone"`
 	RoleID         uuid.UUID  `json:"role_id" db:"role_id"`
-	ProfessionID   uuid.UUID  `json:"profession_id" db:"profession_id"`
+	ProfessionID   *int       `json:"profession_id" db:"profession_id"`
 	Municipality   string     `json:"municipality" db:"municipality"` // Keep for backward compatibility
 	MunicipalityID *int       `json:"municipality_id" db:"municipality_id"`
 	Unit           string     `json:"unit" db:"unit"`

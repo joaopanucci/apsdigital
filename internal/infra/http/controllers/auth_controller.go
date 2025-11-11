@@ -3,7 +3,7 @@ package controllers
 import (
 	"net/http"
 
-	"apsdigital/internal/domain/services"
+	"github.com/joaopanucci/apsdigital/internal/domain/services"
 
 	"github.com/gin-gonic/gin"
 )

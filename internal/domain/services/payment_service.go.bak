@@ -23,15 +23,15 @@ func (s *PaymentService) CreatePayment(ctx context.Context, payment *entities.Pa
 	if payment.FileURL == "" {
 		return errors.New("file URL is required")
 	}
-
+	
 	if payment.Competence == "" {
 		return errors.New("competence is required")
 	}
-
+	
 	if payment.UploadedBy == uuid.Nil {
 		return errors.New("uploaded by user is required")
 	}
-
+	
 	return s.paymentRepo.Create(ctx, payment)
 }
 
@@ -39,7 +39,7 @@ func (s *PaymentService) GetPaymentByID(ctx context.Context, id string) (*entiti
 	if id == "" {
 		return nil, errors.New("invalid payment ID")
 	}
-
+	
 	return s.paymentRepo.GetByID(ctx, id)
 }
 
@@ -51,7 +51,7 @@ func (s *PaymentService) GetPaymentsByMunicipality(ctx context.Context, municipa
 	if filters == nil {
 		filters = make(map[string]interface{})
 	}
-
+	
 	filters["municipality_id"] = municipalityID
 	return s.paymentRepo.GetAll(ctx, filters)
 }
@@ -60,13 +60,13 @@ func (s *PaymentService) UpdatePayment(ctx context.Context, payment *entities.Pa
 	if payment.ID == uuid.Nil {
 		return errors.New("invalid payment ID")
 	}
-
+	
 	// Check if payment exists
 	_, err := s.paymentRepo.GetByID(ctx, payment.ID.String())
 	if err != nil {
 		return errors.New("payment not found")
 	}
-
+	
 	return s.paymentRepo.Update(ctx, payment)
 }
 
@@ -74,13 +74,13 @@ func (s *PaymentService) DeletePayment(ctx context.Context, id string) error {
 	if id == "" {
 		return errors.New("invalid payment ID")
 	}
-
+	
 	// Check if payment exists
 	_, err := s.paymentRepo.GetByID(ctx, id)
 	if err != nil {
 		return errors.New("payment not found")
 	}
-
+	
 	return s.paymentRepo.Delete(ctx, id)
 }
 
@@ -96,19 +96,19 @@ func (s *PaymentService) GetPaymentsWithPagination(ctx context.Context, filters 
 	if page <= 0 {
 		page = 1
 	}
-
+	
 	if limit <= 0 {
 		limit = 10
 	}
-
+	
 	offset := (page - 1) * limit
-
+	
 	if filters == nil {
 		filters = make(map[string]interface{})
 	}
-
+	
 	filters["limit"] = limit
 	filters["offset"] = offset
-
+	
 	return s.paymentRepo.GetAll(ctx, filters)
 }

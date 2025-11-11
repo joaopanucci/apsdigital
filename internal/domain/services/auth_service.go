@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	"apsdigital/internal/config"
-	"apsdigital/internal/domain/entities"
-	"apsdigital/internal/domain/repositories"
+	"github.com/joaopanucci/apsdigital/internal/config"
+	"github.com/joaopanucci/apsdigital/internal/domain/entities"
+	"github.com/joaopanucci/apsdigital/internal/domain/repositories"
+	"github.com/joaopanucci/apsdigital/internal/utils"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -44,15 +45,15 @@ type LoginResponse struct {
 }
 
 type RegisterRequest struct {
-	Email        string    `json:"email" binding:"required,email"`
-	Password     string    `json:"password" binding:"required,min=6"`
-	Name         string    `json:"name" binding:"required"`
-	CPF          string    `json:"cpf" binding:"required"`
-	Phone        string    `json:"phone"`
-	RoleID       uuid.UUID `json:"role_id" binding:"required"`
-	ProfessionID uuid.UUID `json:"profession_id" binding:"required"`
-	Municipality string    `json:"municipality" binding:"required"`
-	Unit         string    `json:"unit"`
+	Email          string    `json:"email" binding:"required,email"`
+	Password       string    `json:"password" binding:"required,min=6"`
+	Name           string    `json:"name" binding:"required"`
+	CPF            string    `json:"cpf" binding:"required"`
+	Phone          string    `json:"phone"`
+	RoleID         uuid.UUID `json:"role_id" binding:"required"`
+	ProfessionID   *int      `json:"profession_id"`
+	MunicipalityID *int      `json:"municipality_id" binding:"required"`
+	Unit           string    `json:"unit"`
 }
 
 func NewAuthService(userRepo repositories.UserRepository, refreshTokenRepo repositories.RefreshTokenRepository, roleRepo repositories.RoleRepository, config *config.Config) *AuthService {
@@ -65,6 +66,14 @@ func NewAuthService(userRepo repositories.UserRepository, refreshTokenRepo repos
 }
 
 func (s *AuthService) Register(ctx context.Context, req *RegisterRequest) (*entities.User, error) {
+	// Validate CPF
+	if !utils.ValidateCPF(req.CPF) {
+		return nil, fmt.Errorf("CPF inválido")
+	}
+	
+	// Clean CPF for storage
+	req.CPF = utils.CleanCPF(req.CPF)
+	
 	// Validate role - prevent ADM registration
 	role, err := s.roleRepo.GetByID(ctx, req.RoleID)
 	if err != nil {
@@ -95,16 +104,17 @@ func (s *AuthService) Register(ctx context.Context, req *RegisterRequest) (*enti
 
 	// Create user
 	user := &entities.User{
-		Email:        req.Email,
-		Password:     string(hashedPassword),
-		Name:         req.Name,
-		CPF:          req.CPF,
-		Phone:        req.Phone,
-		RoleID:       req.RoleID,
-		ProfessionID: req.ProfessionID,
-		Municipality: req.Municipality,
-		Unit:         req.Unit,
-		Status:       entities.UserStatusPendingAuthorization,
+		Email:          req.Email,
+		Password:       string(hashedPassword),
+		Name:           req.Name,
+		CPF:            req.CPF,
+		Phone:          req.Phone,
+		RoleID:         req.RoleID,
+		ProfessionID:   req.ProfessionID,
+		MunicipalityID: req.MunicipalityID,
+		Unit:           req.Unit,
+		Status:         entities.UserStatusPendingAuthorization,
+		IsAuthorized:   false, // Requer autorização por padrão
 	}
 
 	if err := s.userRepo.Create(ctx, user); err != nil {
@@ -115,20 +125,26 @@ func (s *AuthService) Register(ctx context.Context, req *RegisterRequest) (*enti
 }
 
 func (s *AuthService) Login(ctx context.Context, req *LoginRequest) (*LoginResponse, error) {
+	// Validate and clean CPF
+	if !utils.ValidateCPF(req.CPF) {
+		return nil, fmt.Errorf("credenciais inválidas")
+	}
+	req.CPF = utils.CleanCPF(req.CPF)
+	
 	// Get user by CPF
 	user, err := s.userRepo.GetByCPF(ctx, req.CPF)
 	if err != nil {
-		return nil, fmt.Errorf("invalid credentials")
+		return nil, fmt.Errorf("credenciais inválidas")
 	}
 
 	// Check if user is active
 	if user.Status != entities.UserStatusActive {
-		return nil, fmt.Errorf("user account is not active")
+		return nil, fmt.Errorf("conta de usuário não está ativa")
 	}
 
 	// Check if user is authorized (new requirement)
 	if !user.IsAuthorized {
-		return nil, fmt.Errorf("user account is not authorized")
+		return nil, fmt.Errorf("seu cadastro ainda não foi autorizado")
 	}
 
 	// Verify password

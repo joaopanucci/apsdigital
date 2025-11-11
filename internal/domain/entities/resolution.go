@@ -16,6 +16,7 @@ const (
 type Resolution struct {
 	ID               uuid.UUID      `json:"id" db:"id"`
 	Title            string         `json:"title" db:"title"`
+	Number           string         `json:"number" db:"number"` // Resolution number
 	FileURL          string         `json:"file_url" db:"file_url"`
 	Year             int            `json:"year" db:"year"`
 	Type             ResolutionType `json:"type" db:"type"`
@@ -24,10 +25,13 @@ type Resolution struct {
 	OriginalFileName string         `json:"original_file_name" db:"original_file_name"`
 	FileSize         int64          `json:"file_size" db:"file_size"`
 	UploadedBy       uuid.UUID      `json:"uploaded_by" db:"uploaded_by"`
+	UploadedByName   string         `json:"uploaded_by_name"` // Computed field
+	UploadedByCPF    string         `json:"uploaded_by_cpf"`  // Computed field
 	MunicipalityID   *int           `json:"municipality_id" db:"municipality_id"`
+	MunicipalityName string         `json:"municipality_name"` // Computed field
 	CreatedAt        time.Time      `json:"created_at" db:"created_at"`
 	UpdatedAt        time.Time      `json:"updated_at" db:"updated_at"`
-	
+
 	// Relations
 	UploadedByUser   *User         `json:"uploaded_by_user,omitempty"`
 	MunicipalityInfo *Municipality `json:"municipality_info,omitempty"`
