@@ -3,8 +3,8 @@ package repositories
 import (
 	"context"
 
-	"github.com/joaopanucci/apsdigital/internal/domain/entities"
 	"github.com/google/uuid"
+	"github.com/joaopanucci/apsdigital/internal/domain/entities"
 )
 
 type UserRepository interface {

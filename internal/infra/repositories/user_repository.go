@@ -25,14 +25,14 @@ func (r *userRepository) Create(ctx context.Context, user *entities.User) error 
 		INSERT INTO users (id, email, password, name, cpf, phone, role_id, profession_id, municipality, unit, status)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`
-	
+
 	user.ID = uuid.New()
 	_, err := r.db.Pool.Exec(ctx, query,
 		user.ID, user.Email, user.Password, user.Name, user.CPF,
 		user.Phone, user.RoleID, user.ProfessionID, user.Municipality,
 		user.Unit, user.Status,
 	)
-	
+
 	return err
 }
 
@@ -48,31 +48,31 @@ func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (*entities.U
 		LEFT JOIN professions p ON u.profession_id = p.id
 		WHERE u.id = $1
 	`
-	
+
 	row := r.db.Pool.QueryRow(ctx, query, id)
-	
+
 	var user entities.User
 	var role entities.Role
 	var profession entities.Profession
-	
+
 	err := row.Scan(
 		&user.ID, &user.Email, &user.Password, &user.Name, &user.CPF,
 		&user.Phone, &user.RoleID, &user.ProfessionID, &user.Municipality,
 		&user.Unit, &user.Status, &user.CreatedAt, &user.UpdatedAt,
 		&role.ID, &role.Name, &role.Description, &role.Level, &role.CreatedAt, &role.UpdatedAt,
-		&profession.ID, &profession.Name, &profession.Description, &profession.IsActive, &profession.CreatedAt, &profession.UpdatedAt,
+		&profession.ID, &profession.Name, &profession.CreatedAt, &profession.UpdatedAt,
 	)
-	
+
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("user not found")
 		}
 		return nil, err
 	}
-	
+
 	user.Role = &role
 	user.Profession = &profession
-	
+
 	return &user, nil
 }
 
@@ -88,31 +88,31 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*entitie
 		LEFT JOIN professions p ON u.profession_id = p.id
 		WHERE u.email = $1
 	`
-	
+
 	row := r.db.Pool.QueryRow(ctx, query, email)
-	
+
 	var user entities.User
 	var role entities.Role
 	var profession entities.Profession
-	
+
 	err := row.Scan(
 		&user.ID, &user.Email, &user.Password, &user.Name, &user.CPF,
 		&user.Phone, &user.RoleID, &user.ProfessionID, &user.Municipality,
 		&user.Unit, &user.Status, &user.CreatedAt, &user.UpdatedAt,
 		&role.ID, &role.Name, &role.Description, &role.Level, &role.CreatedAt, &role.UpdatedAt,
-		&profession.ID, &profession.Name, &profession.Description, &profession.IsActive, &profession.CreatedAt, &profession.UpdatedAt,
+		&profession.ID, &profession.Name, &profession.CreatedAt, &profession.UpdatedAt,
 	)
-	
+
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("user not found")
 		}
 		return nil, err
 	}
-	
+
 	user.Role = &role
 	user.Profession = &profession
-	
+
 	return &user, nil
 }
 
@@ -124,24 +124,24 @@ func (r *userRepository) GetByCPF(ctx context.Context, cpf string) (*entities.Us
 		FROM users u
 		WHERE u.cpf = $1
 	`
-	
+
 	row := r.db.Pool.QueryRow(ctx, query, cpf)
-	
+
 	var user entities.User
-	
+
 	err := row.Scan(
 		&user.ID, &user.Email, &user.Password, &user.Name, &user.CPF,
 		&user.Phone, &user.RoleID, &user.ProfessionID, &user.Municipality,
 		&user.Unit, &user.Status, &user.CreatedAt, &user.UpdatedAt,
 	)
-	
+
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("user not found")
 		}
 		return nil, err
 	}
-	
+
 	return &user, nil
 }
 
@@ -152,12 +152,12 @@ func (r *userRepository) Update(ctx context.Context, user *entities.User) error 
 		    municipality = $7, unit = $8, status = $9, updated_at = NOW()
 		WHERE id = $1
 	`
-	
+
 	_, err := r.db.Pool.Exec(ctx, query,
 		user.ID, user.Email, user.Name, user.Phone, user.RoleID,
 		user.ProfessionID, user.Municipality, user.Unit, user.Status,
 	)
-	
+
 	return err
 }
 
@@ -177,11 +177,11 @@ func (r *userRepository) List(ctx context.Context, filters map[string]interface{
 		LEFT JOIN roles r ON u.role_id = r.id
 		LEFT JOIN professions p ON u.profession_id = p.id
 	`
-	
+
 	var conditions []string
 	var args []interface{}
 	argCount := 0
-	
+
 	for key, value := range filters {
 		argCount++
 		switch key {
@@ -196,25 +196,25 @@ func (r *userRepository) List(ctx context.Context, filters map[string]interface{
 		}
 		args = append(args, value)
 	}
-	
+
 	if len(conditions) > 0 {
 		query += " WHERE " + strings.Join(conditions, " AND ")
 	}
-	
+
 	query += " ORDER BY u.created_at DESC"
-	
+
 	rows, err := r.db.Pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var users []*entities.User
-	
+
 	for rows.Next() {
 		var user entities.User
 		var roleName, professionName string
-		
+
 		err := rows.Scan(
 			&user.ID, &user.Email, &user.Name, &user.CPF, &user.Phone,
 			&user.RoleID, &user.ProfessionID, &user.Municipality, &user.Unit,
@@ -224,13 +224,13 @@ func (r *userRepository) List(ctx context.Context, filters map[string]interface{
 		if err != nil {
 			return nil, err
 		}
-		
+
 		user.Role = &entities.Role{Name: roleName}
 		user.Profession = &entities.Profession{Name: professionName}
-		
+
 		users = append(users, &user)
 	}
-	
+
 	return users, nil
 }
 
@@ -246,21 +246,21 @@ func (r *userRepository) GetPendingAuthorization(ctx context.Context) ([]*entiti
 		WHERE u.status = 'pending_authorization'
 		ORDER BY u.created_at ASC
 	`
-	
+
 	rows, err := r.db.Pool.Query(ctx, query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var users []*entities.User
-	
+
 	for rows.Next() {
 		var user entities.User
 		var roleName string
 		var roleLevel int
 		var professionName string
-		
+
 		err := rows.Scan(
 			&user.ID, &user.Email, &user.Name, &user.CPF, &user.Phone,
 			&user.RoleID, &user.ProfessionID, &user.Municipality, &user.Unit,
@@ -270,12 +270,12 @@ func (r *userRepository) GetPendingAuthorization(ctx context.Context) ([]*entiti
 		if err != nil {
 			return nil, err
 		}
-		
+
 		user.Role = &entities.Role{Name: roleName, Level: roleLevel}
 		user.Profession = &entities.Profession{Name: professionName}
-		
+
 		users = append(users, &user)
 	}
-	
+
 	return users, nil
 }

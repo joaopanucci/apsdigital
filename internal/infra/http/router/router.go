@@ -25,6 +25,7 @@ func NewRouter(database *db.PostgresDB, cfg *config.Config) *gin.Engine {
 	municipalityRepo := repositories.NewMunicipalityRepository(database)
 	paymentRepo := repositories.NewPaymentRepository(database)
 	resolutionRepo := repositories.NewResolutionRepository(database)
+	professionRepo := repositories.NewProfessionRepository(database)
 
 	// Initialize services
 	// authService := services.NewAuthService(userRepo, refreshTokenRepo, roleRepo, cfg)  // TODO: Fix AuthorizeUser method
@@ -32,6 +33,7 @@ func NewRouter(database *db.PostgresDB, cfg *config.Config) *gin.Engine {
 	// tabletService := services.NewTabletService(tabletRepo, userRepo)  // TODO: Fix AuthorizeUser method
 	paymentService := services.NewPaymentService(paymentRepo)
 	resolutionService := services.NewResolutionService(resolutionRepo)
+	professionService := services.NewProfessionService(professionRepo)
 
 	// Initialize controllers
 	// authController := controllers.NewAuthController(authService)  // TODO: Fix AuthorizeUser method
@@ -39,6 +41,7 @@ func NewRouter(database *db.PostgresDB, cfg *config.Config) *gin.Engine {
 	// tabletController := controllers.NewTabletController(tabletService)  // TODO: Fix AuthorizeUser method
 	paymentController := controllers.NewPaymentController(paymentService)
 	resolutionController := controllers.NewResolutionController(resolutionService)
+	professionController := controllers.NewProfessionController(professionService)
 
 	// API Routes with /api/v1 prefix (for direct API access)
 	api := r.Group("/api/v1")
@@ -70,6 +73,16 @@ func NewRouter(database *db.PostgresDB, cfg *config.Config) *gin.Engine {
 			resolutions.GET("/types", resolutionController.GetTypesPublic)
 			resolutions.GET("/years", resolutionController.GetYearsPublic)
 			resolutions.POST("/upload", resolutionController.UploadResolutionFile)
+		}
+
+		// Professions
+		professions := api.Group("/professions")
+		{
+			professions.GET("/", professionController.GetProfessions)
+			professions.GET("/:id", professionController.GetProfessionByID)
+			professions.POST("/", professionController.CreateProfession)
+			professions.PUT("/:id", professionController.UpdateProfession)
+			professions.DELETE("/:id", professionController.DeleteProfession)
 		}
 	}
 
@@ -104,6 +117,16 @@ func NewRouter(database *db.PostgresDB, cfg *config.Config) *gin.Engine {
 			resolutionsRoot.GET("/years", resolutionController.GetYearsPublic)
 			resolutionsRoot.POST("/upload", resolutionController.UploadResolutionFile)
 		}
+
+		// Professions
+		professionsRoot := r.Group("/professions")
+		{
+			professionsRoot.GET("/", professionController.GetProfessions)
+			professionsRoot.GET("/:id", professionController.GetProfessionByID)
+			professionsRoot.POST("/", professionController.CreateProfession)
+			professionsRoot.PUT("/:id", professionController.UpdateProfession)
+			professionsRoot.DELETE("/:id", professionController.DeleteProfession)
+		}
 	}
 
 	// Temporary workaround: Add /api prefix routes directly in backend
@@ -135,6 +158,16 @@ func NewRouter(database *db.PostgresDB, cfg *config.Config) *gin.Engine {
 			apiResolutions.GET("/types", resolutionController.GetTypesPublic)
 			apiResolutions.GET("/years", resolutionController.GetYearsPublic)
 			apiResolutions.POST("/upload", resolutionController.UploadResolutionFile)
+		}
+
+		// Professions
+		apiProfessions := apiGroup.Group("/professions")
+		{
+			apiProfessions.GET("/", professionController.GetProfessions)
+			apiProfessions.GET("/:id", professionController.GetProfessionByID)
+			apiProfessions.POST("/", professionController.CreateProfession)
+			apiProfessions.PUT("/:id", professionController.UpdateProfession)
+			apiProfessions.DELETE("/:id", professionController.DeleteProfession)
 		}
 	}
 
