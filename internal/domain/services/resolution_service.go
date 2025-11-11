@@ -1,0 +1,129 @@
+package services
+
+import (
+	"context"
+	"errors"
+
+	"github.com/joaopanucci/apsdigital/internal/domain/entities"
+	"github.com/joaopanucci/apsdigital/internal/infra/repositories"
+)
+
+type ResolutionService struct {
+	resolutionRepo *repositories.ResolutionRepository
+}
+
+func NewResolutionService(resolutionRepo *repositories.ResolutionRepository) *ResolutionService {
+	return &ResolutionService{
+		resolutionRepo: resolutionRepo,
+	}
+}
+
+func (s *ResolutionService) CreateResolution(ctx context.Context, resolution *entities.Resolution) error {
+	if resolution.Title == "" {
+		return errors.New("title is required")
+	}
+	
+	if resolution.FileURL == "" {
+		return errors.New("file URL is required")
+	}
+	
+	if resolution.Type == "" {
+		return errors.New("type is required")
+	}
+	
+	if resolution.Type != "MS" && resolution.Type != "SES" {
+		return errors.New("type must be MS or SES")
+	}
+	
+	if resolution.UploadedBy == 0 {
+		return errors.New("uploaded by user is required")
+	}
+	
+	return s.resolutionRepo.Create(ctx, resolution)
+}
+
+func (s *ResolutionService) GetResolutionByID(ctx context.Context, id uint) (*entities.Resolution, error) {
+	if id == 0 {
+		return nil, errors.New("invalid resolution ID")
+	}
+	
+	return s.resolutionRepo.GetByID(ctx, id)
+}
+
+func (s *ResolutionService) GetAllResolutions(ctx context.Context, filters map[string]interface{}) ([]*entities.Resolution, error) {
+	return s.resolutionRepo.GetAll(ctx, filters)
+}
+
+func (s *ResolutionService) GetResolutionsByMunicipality(ctx context.Context, municipalityID uint, filters map[string]interface{}) ([]*entities.Resolution, error) {
+	if filters == nil {
+		filters = make(map[string]interface{})
+	}
+	
+	filters["municipality_id"] = municipalityID
+	return s.resolutionRepo.GetAll(ctx, filters)
+}
+
+func (s *ResolutionService) UpdateResolution(ctx context.Context, resolution *entities.Resolution) error {
+	if resolution.ID == 0 {
+		return errors.New("invalid resolution ID")
+	}
+	
+	// Check if resolution exists
+	_, err := s.resolutionRepo.GetByID(ctx, resolution.ID)
+	if err != nil {
+		return errors.New("resolution not found")
+	}
+	
+	return s.resolutionRepo.Update(ctx, resolution)
+}
+
+func (s *ResolutionService) DeleteResolution(ctx context.Context, id uint) error {
+	if id == 0 {
+		return errors.New("invalid resolution ID")
+	}
+	
+	// Check if resolution exists
+	_, err := s.resolutionRepo.GetByID(ctx, id)
+	if err != nil {
+		return errors.New("resolution not found")
+	}
+	
+	return s.resolutionRepo.Delete(ctx, id)
+}
+
+func (s *ResolutionService) GetTypes(ctx context.Context, municipalityID *uint) ([]string, error) {
+	return s.resolutionRepo.GetTypes(ctx, municipalityID)
+}
+
+func (s *ResolutionService) GetYears(ctx context.Context, municipalityID *uint) ([]int, error) {
+	return s.resolutionRepo.GetYears(ctx, municipalityID)
+}
+
+func (s *ResolutionService) GetRecentResolutions(ctx context.Context, municipalityID *uint, limit int) ([]*entities.Resolution, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	
+	return s.resolutionRepo.GetRecent(ctx, municipalityID, limit)
+}
+
+func (s *ResolutionService) GetResolutionsWithPagination(ctx context.Context, filters map[string]interface{}, page, limit int) ([]*entities.Resolution, error) {
+	if page <= 0 {
+		page = 1
+	}
+	
+	if limit <= 0 {
+		limit = 10
+	}
+	
+	offset := (page - 1) * limit
+	
+	if filters == nil {
+		filters = make(map[string]interface{})
+	}
+	
+	filters["limit"] = limit
+	filters["offset"] = offset
+	
+	return s.resolutionRepo.GetAll(ctx, filters)
+}

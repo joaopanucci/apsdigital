@@ -1,0 +1,367 @@
+package controllers
+
+import (
+	"net/http"
+	"strconv"
+
+	"github.com/gin-gonic/gin"
+	"github.com/joaopanucci/apsdigital/internal/domain/entities"
+	"github.com/joaopanucci/apsdigital/internal/domain/services"
+)
+
+type ResolutionController struct {
+	resolutionService *services.ResolutionService
+}
+
+func NewResolutionController(resolutionService *services.ResolutionService) *ResolutionController {
+	return &ResolutionController{
+		resolutionService: resolutionService,
+	}
+}
+
+type CreateResolutionRequest struct {
+	Title          string `json:"title" binding:"required"`
+	FileURL        string `json:"file_url" binding:"required"`
+	Competence     string `json:"competence"`
+	Type           string `json:"type" binding:"required"`
+	Year           int    `json:"year" binding:"required"`
+	Number         string `json:"number"`
+	MunicipalityID uint   `json:"municipality_id" binding:"required"`
+}
+
+type ResolutionFilters struct {
+	Year           string `form:"year"`
+	Type           string `form:"type"`
+	Number         string `form:"number"`
+	Competence     string `form:"competence"`
+	MunicipalityID string `form:"municipality_id"`
+	Page           int    `form:"page"`
+	Limit          int    `form:"limit"`
+}
+
+func (c *ResolutionController) CreateResolution(ctx *gin.Context) {
+	var req CreateResolutionRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user from context (set by auth middleware)
+	user, exists := ctx.Get("user")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	userEntity := user.(*entities.User)
+
+	resolution := &entities.Resolution{
+		Title:          req.Title,
+		FileURL:        req.FileURL,
+		Competence:     req.Competence,
+		Type:           req.Type,
+		Year:           req.Year,
+		Number:         req.Number,
+		UploadedBy:     userEntity.ID,
+		MunicipalityID: req.MunicipalityID,
+	}
+
+	if err := c.resolutionService.CreateResolution(ctx.Request.Context(), resolution); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusCreated, resolution)
+}
+
+func (c *ResolutionController) GetResolutions(ctx *gin.Context) {
+	var filters ResolutionFilters
+	if err := ctx.ShouldBindQuery(&filters); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Get user from context
+	user, exists := ctx.Get("user")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	userEntity := user.(*entities.User)
+
+	// Build filters map
+	filterMap := make(map[string]interface{})
+
+	// Add municipality filter for non-admin users
+	if userEntity.Role.Name != "ADM" {
+		filterMap["municipality_id"] = userEntity.MunicipalityID
+	} else if filters.MunicipalityID != "" {
+		municipalityID, err := strconv.ParseUint(filters.MunicipalityID, 10, 32)
+		if err == nil {
+			filterMap["municipality_id"] = uint(municipalityID)
+		}
+	}
+
+	if filters.Year != "" {
+		year, err := strconv.Atoi(filters.Year)
+		if err == nil {
+			filterMap["year"] = year
+		}
+	}
+
+	if filters.Type != "" {
+		filterMap["type"] = filters.Type
+	}
+
+	if filters.Number != "" {
+		filterMap["number"] = filters.Number
+	}
+
+	if filters.Competence != "" {
+		filterMap["competence"] = filters.Competence
+	}
+
+	var resolutions []*entities.Resolution
+	var err error
+
+	if filters.Page > 0 && filters.Limit > 0 {
+		resolutions, err = c.resolutionService.GetResolutionsWithPagination(ctx.Request.Context(), filterMap, filters.Page, filters.Limit)
+	} else {
+		resolutions, err = c.resolutionService.GetAllResolutions(ctx.Request.Context(), filterMap)
+	}
+
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, resolutions)
+}
+
+func (c *ResolutionController) GetResolutionByID(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid resolution ID"})
+		return
+	}
+
+	resolution, err := c.resolutionService.GetResolutionByID(ctx.Request.Context(), uint(id))
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "Resolution not found"})
+		return
+	}
+
+	// Check access permissions
+	user, exists := ctx.Get("user")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	userEntity := user.(*entities.User)
+
+	// Admin can access all, others only their municipality
+	if userEntity.Role.Name != "ADM" && resolution.MunicipalityID != userEntity.MunicipalityID {
+		ctx.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, resolution)
+}
+
+func (c *ResolutionController) UpdateResolution(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid resolution ID"})
+		return
+	}
+
+	var req CreateResolutionRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	resolution := &entities.Resolution{
+		ID:         uint(id),
+		Title:      req.Title,
+		FileURL:    req.FileURL,
+		Competence: req.Competence,
+		Type:       req.Type,
+		Year:       req.Year,
+		Number:     req.Number,
+	}
+
+	if err := c.resolutionService.UpdateResolution(ctx.Request.Context(), resolution); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, resolution)
+}
+
+func (c *ResolutionController) DeleteResolution(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid resolution ID"})
+		return
+	}
+
+	if err := c.resolutionService.DeleteResolution(ctx.Request.Context(), uint(id)); err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "Resolution deleted successfully"})
+}
+
+func (c *ResolutionController) GetTypes(ctx *gin.Context) {
+	user, exists := ctx.Get("user")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	userEntity := user.(*entities.User)
+
+	var municipalityID *uint
+	if userEntity.Role.Name != "ADM" {
+		municipalityID = &userEntity.MunicipalityID
+	}
+
+	types, err := c.resolutionService.GetTypes(ctx.Request.Context(), municipalityID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"types": types})
+}
+
+func (c *ResolutionController) GetYears(ctx *gin.Context) {
+	user, exists := ctx.Get("user")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	userEntity := user.(*entities.User)
+
+	var municipalityID *uint
+	if userEntity.Role.Name != "ADM" {
+		municipalityID = &userEntity.MunicipalityID
+	}
+
+	years, err := c.resolutionService.GetYears(ctx.Request.Context(), municipalityID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"years": years})
+}
+
+func (c *ResolutionController) GetRecentResolutions(ctx *gin.Context) {
+	limitStr := ctx.DefaultQuery("limit", "10")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil {
+		limit = 10
+	}
+
+	user, exists := ctx.Get("user")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	userEntity := user.(*entities.User)
+
+	var municipalityID *uint
+	if userEntity.Role.Name != "ADM" {
+		municipalityID = &userEntity.MunicipalityID
+	}
+
+	resolutions, err := c.resolutionService.GetRecentResolutions(ctx.Request.Context(), municipalityID, limit)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, resolutions)
+}
+
+func (c *ResolutionController) ViewPDF(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid resolution ID"})
+		return
+	}
+
+	resolution, err := c.resolutionService.GetResolutionByID(ctx.Request.Context(), uint(id))
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "Resolution not found"})
+		return
+	}
+
+	// Check access permissions
+	user, exists := ctx.Get("user")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	userEntity := user.(*entities.User)
+
+	// Admin can access all, others only their municipality
+	if userEntity.Role.Name != "ADM" && resolution.MunicipalityID != userEntity.MunicipalityID {
+		ctx.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	// Return the PDF URL for frontend to handle
+	ctx.JSON(http.StatusOK, gin.H{
+		"file_url": resolution.FileURL,
+		"filename": "resolucao-" + resolution.Number + ".pdf",
+	})
+}
+
+func (c *ResolutionController) DownloadPDF(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid resolution ID"})
+		return
+	}
+
+	resolution, err := c.resolutionService.GetResolutionByID(ctx.Request.Context(), uint(id))
+	if err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "Resolution not found"})
+		return
+	}
+
+	// Check access permissions
+	user, exists := ctx.Get("user")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		return
+	}
+
+	userEntity := user.(*entities.User)
+
+	// Admin can access all, others only their municipality
+	if userEntity.Role.Name != "ADM" && resolution.MunicipalityID != userEntity.MunicipalityID {
+		ctx.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	// Return the PDF URL for frontend to handle download
+	ctx.JSON(http.StatusOK, gin.H{
+		"file_url": resolution.FileURL,
+		"filename": "resolucao-" + resolution.Number + ".pdf",
+	})
+}

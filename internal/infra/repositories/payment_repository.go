@@ -1,0 +1,220 @@
+package repositories
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"strings"
+
+	"github.com/joaopanucci/apsdigital/internal/domain/entities"
+)
+
+type PaymentRepository struct {
+	db *sql.DB
+}
+
+func NewPaymentRepository(db *sql.DB) *PaymentRepository {
+	return &PaymentRepository{db: db}
+}
+
+func (r *PaymentRepository) Create(ctx context.Context, payment *entities.Payment) error {
+	query := `
+		INSERT INTO payments (file_url, competence, uploaded_by, municipality_id, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, NOW(), NOW())
+		RETURNING id, created_at, updated_at
+	`
+	
+	row := r.db.QueryRowContext(ctx, query, payment.FileURL, payment.Competence, payment.UploadedBy, payment.MunicipalityID)
+	
+	return row.Scan(&payment.ID, &payment.CreatedAt, &payment.UpdatedAt)
+}
+
+func (r *PaymentRepository) GetByID(ctx context.Context, id uint) (*entities.Payment, error) {
+	query := `
+		SELECT p.id, p.file_url, p.competence, p.uploaded_by, p.municipality_id, p.created_at, p.updated_at,
+		       u.name as uploaded_by_name, u.cpf as uploaded_by_cpf,
+		       m.name as municipality_name
+		FROM payments p
+		LEFT JOIN users u ON p.uploaded_by = u.id
+		LEFT JOIN municipalities m ON p.municipality_id = m.id
+		WHERE p.id = $1
+	`
+	
+	var payment entities.Payment
+	row := r.db.QueryRowContext(ctx, query, id)
+	
+	err := row.Scan(
+		&payment.ID, &payment.FileURL, &payment.Competence, &payment.UploadedBy, &payment.MunicipalityID,
+		&payment.CreatedAt, &payment.UpdatedAt, &payment.UploadedByName, &payment.UploadedByCPF, &payment.MunicipalityName,
+	)
+	
+	if err != nil {
+		return nil, err
+	}
+	
+	return &payment, nil
+}
+
+func (r *PaymentRepository) GetAll(ctx context.Context, filters map[string]interface{}) ([]*entities.Payment, error) {
+	query := `
+		SELECT p.id, p.file_url, p.competence, p.uploaded_by, p.municipality_id, p.created_at, p.updated_at,
+		       u.name as uploaded_by_name, u.cpf as uploaded_by_cpf,
+		       m.name as municipality_name
+		FROM payments p
+		LEFT JOIN users u ON p.uploaded_by = u.id
+		LEFT JOIN municipalities m ON p.municipality_id = m.id
+	`
+	
+	var whereConditions []string
+	var args []interface{}
+	argIndex := 1
+	
+	// Filter by municipality
+	if municipalityID, ok := filters["municipality_id"]; ok && municipalityID != nil {
+		whereConditions = append(whereConditions, fmt.Sprintf("p.municipality_id = $%d", argIndex))
+		args = append(args, municipalityID)
+		argIndex++
+	}
+	
+	// Filter by year
+	if year, ok := filters["year"]; ok && year != nil && year != "" {
+		whereConditions = append(whereConditions, fmt.Sprintf("EXTRACT(YEAR FROM p.created_at) = $%d", argIndex))
+		args = append(args, year)
+		argIndex++
+	}
+	
+	// Filter by month
+	if month, ok := filters["month"]; ok && month != nil && month != "" {
+		whereConditions = append(whereConditions, fmt.Sprintf("EXTRACT(MONTH FROM p.created_at) = $%d", argIndex))
+		args = append(args, month)
+		argIndex++
+	}
+	
+	// Filter by competence
+	if competence, ok := filters["competence"]; ok && competence != nil && competence != "" {
+		whereConditions = append(whereConditions, fmt.Sprintf("p.competence = $%d", argIndex))
+		args = append(args, competence)
+		argIndex++
+	}
+	
+	if len(whereConditions) > 0 {
+		query += " WHERE " + strings.Join(whereConditions, " AND ")
+	}
+	
+	query += " ORDER BY p.created_at DESC"
+	
+	// Add limit if specified
+	if limit, ok := filters["limit"]; ok && limit != nil {
+		query += fmt.Sprintf(" LIMIT $%d", argIndex)
+		args = append(args, limit)
+		argIndex++
+	}
+	
+	// Add offset if specified
+	if offset, ok := filters["offset"]; ok && offset != nil {
+		query += fmt.Sprintf(" OFFSET $%d", argIndex)
+		args = append(args, offset)
+	}
+	
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var payments []*entities.Payment
+	for rows.Next() {
+		var payment entities.Payment
+		err := rows.Scan(
+			&payment.ID, &payment.FileURL, &payment.Competence, &payment.UploadedBy, &payment.MunicipalityID,
+			&payment.CreatedAt, &payment.UpdatedAt, &payment.UploadedByName, &payment.UploadedByCPF, &payment.MunicipalityName,
+		)
+		if err != nil {
+			return nil, err
+		}
+		payments = append(payments, &payment)
+	}
+	
+	return payments, nil
+}
+
+func (r *PaymentRepository) Update(ctx context.Context, payment *entities.Payment) error {
+	query := `
+		UPDATE payments 
+		SET file_url = $2, competence = $3, updated_at = NOW()
+		WHERE id = $1
+	`
+	
+	_, err := r.db.ExecContext(ctx, query, payment.ID, payment.FileURL, payment.Competence)
+	return err
+}
+
+func (r *PaymentRepository) Delete(ctx context.Context, id uint) error {
+	query := "DELETE FROM payments WHERE id = $1"
+	_, err := r.db.ExecContext(ctx, query, id)
+	return err
+}
+
+func (r *PaymentRepository) GetCompetences(ctx context.Context, municipalityID *uint) ([]string, error) {
+	query := `
+		SELECT DISTINCT competence 
+		FROM payments 
+	`
+	
+	var args []interface{}
+	if municipalityID != nil {
+		query += " WHERE municipality_id = $1"
+		args = append(args, *municipalityID)
+	}
+	
+	query += " ORDER BY competence DESC"
+	
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var competences []string
+	for rows.Next() {
+		var competence string
+		if err := rows.Scan(&competence); err != nil {
+			return nil, err
+		}
+		competences = append(competences, competence)
+	}
+	
+	return competences, nil
+}
+
+func (r *PaymentRepository) GetYears(ctx context.Context, municipalityID *uint) ([]int, error) {
+	query := `
+		SELECT DISTINCT EXTRACT(YEAR FROM created_at) as year 
+		FROM payments 
+	`
+	
+	var args []interface{}
+	if municipalityID != nil {
+		query += " WHERE municipality_id = $1"
+		args = append(args, *municipalityID)
+	}
+	
+	query += " ORDER BY year DESC"
+	
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var years []int
+	for rows.Next() {
+		var year int
+		if err := rows.Scan(&year); err != nil {
+			return nil, err
+		}
+		years = append(years, year)
+	}
+	
+	return years, nil
+}
